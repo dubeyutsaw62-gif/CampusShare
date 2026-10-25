@@ -16,7 +16,6 @@ public class ProductDTO {
     private int quantity;
     private double price;
     private String purpose;
-    @Lob // Tells Hibernate to create a BLOB/LONGBLOB column datatype
-    @Column(length = 1000000) // Allocates enough storage space for large files
-    private byte[] imageBytes;
+    private String imageUrl;        // e.g. /api/products/5/image, or null
+    private Integer createdByUserId;
 }

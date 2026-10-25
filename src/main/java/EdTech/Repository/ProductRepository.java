@@ -3,6 +3,7 @@ package EdTech.Repository;
 import EdTech.Entity.ProductEntity;
 import EdTech.Entity.TransactionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,4 +24,7 @@ public interface ProductRepository extends JpaRepository<ProductEntity,Integer> 
             @Param("minPrice") Double minPrice,
             @Param("maxPrice") Double maxPrice
     );
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ProductEntity p SET p.quantity = p.quantity - 1 WHERE p.id = :id AND p.quantity > 0")
+    int decrementStock(@Param("id") Integer id);
 }

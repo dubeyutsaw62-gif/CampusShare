@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CampusShare</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%234f46e5'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EC%3C/text%3E%3C/svg%3E">
+    <style>
+        :root{
+            --bg:#f5f6fb; --surface:#ffffff; --surface-2:#eef0f8; --text:#161a2d; --muted:#667085;
+            --line:#e3e6f0; --brand:#4f46e5; --brand-2:#06b6d4; --brand-ink:#ffffff;
+            --ok:#12805c; --warn:#b45309; --danger:#d92d20; --shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06);
+            --radius:16px;
+        }
+        @media (prefers-color-scheme:dark){
+            :root{ --bg:#0d1020; --surface:#161a30; --surface-2:#1e2340; --text:#eceefb; --muted:#9aa3c4;
+                --line:#2a3050; --brand:#7c78ff; --brand-2:#22d3ee; --brand-ink:#0d1020;
+                --ok:#4ade80; --warn:#fbbf24; --danger:#f97066; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);}
+        }
+        *{box-sizing:border-box}
+        [hidden]{display:none!important}
+        html{scroll-behavior:smooth}
+        body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+        button,input,select{font:inherit;color:inherit}
+        .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+
+        /* header */
+        header{position:sticky;top:0;z-index:20;backdrop-filter:saturate(1.4) blur(14px);background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom:1px solid var(--line)}
+        .bar{display:flex;align-items:center;gap:14px;height:64px}
+        .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+        .logo i{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#fff;font-style:normal;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+        .spacer{flex:1}
+        .user{display:flex;align-items:center;gap:10px}
+        .avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2))}
+
+        /* buttons */
+        .btn{border:1px solid var(--line);background:var(--surface);padding:9px 16px;border-radius:12px;cursor:pointer;font-weight:600;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+        .btn:hover{border-color:var(--brand);transform:translateY(-1px)}
+        .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+        .btn.primary{background:linear-gradient(135deg,var(--brand),color-mix(in srgb,var(--brand) 60%,var(--brand-2)));color:#fff;border-color:transparent;box-shadow:0 6px 18px color-mix(in srgb,var(--brand) 35%,transparent)}
+        .btn.danger{color:var(--danger)}
+        .btn.small{padding:6px 12px;font-size:13px;border-radius:10px}
+        .btn.ghost{background:transparent;border-color:transparent}
+        .btn:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 45%,transparent);outline-offset:1px}
+
+        /* hero */
+        .hero{padding:44px 0 26px}
+        .hero h1{font-size:clamp(28px,4.4vw,46px);line-height:1.08;letter-spacing:-.035em;margin:0 0 10px;max-width:16em}
+        .hero h1 span{background:linear-gradient(120deg,var(--brand),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+        .hero p{color:var(--muted);margin:0;max-width:40em;font-size:17px}
+
+        /* toolbar */
+        .tabs{display:flex;gap:6px;background:var(--surface-2);padding:5px;border-radius:14px;width:max-content;max-width:100%}
+        .tab{border:0;background:transparent;padding:8px 16px;border-radius:10px;font-weight:600;color:var(--muted);cursor:pointer}
+        .tab[aria-selected=true]{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+        .filters{display:grid;grid-template-columns:2fr 1.2fr .8fr .8fr 1fr;gap:10px;margin:18px 0 8px}
+        @media(max-width:860px){.filters{grid-template-columns:1fr 1fr}.filters .f-name{grid-column:1/-1}}
+        .field{display:flex;flex-direction:column;gap:6px}
+        .field label{font-size:13px;font-weight:600;color:var(--muted)}
+        input,select{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%}
+        input[type=file]{padding:8px}
+        .meta{display:flex;justify-content:space-between;align-items:center;margin:14px 0;color:var(--muted);font-size:14px;gap:10px;flex-wrap:wrap}
+
+        /* grid */
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px;padding-bottom:70px}
+        .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:.18s;cursor:pointer}
+        .card:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--brand) 50%,var(--line))}
+        .thumb{aspect-ratio:4/3;background:var(--surface-2);position:relative;overflow:hidden}
+        .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+        .ph{width:100%;height:100%;display:grid;place-items:center;font-size:54px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2));opacity:.9}
+        .chip{position:absolute;top:10px;left:10px;background:rgba(10,12,28,.7);color:#fff;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;backdrop-filter:blur(6px)}
+        .mine{position:absolute;top:10px;right:10px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:99px}
+        .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+        .body h3{margin:0;font-size:16px;line-height:1.3;letter-spacing:-.01em;overflow-wrap:anywhere}
+        .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+        .price{font-weight:800;font-size:19px}
+        .badge{font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--surface-2);color:var(--muted)}
+        .badge.low{color:var(--warn)}.badge.out{color:var(--danger)}
+        .actions{display:flex;gap:8px;margin-top:auto;padding-top:6px}
+        .actions .btn{flex:1}
+
+        /* skeleton / empty */
+        .sk{height:300px;border-radius:var(--radius);background:linear-gradient(100deg,var(--surface) 30%,var(--surface-2) 50%,var(--surface) 70%);background-size:300% 100%;animation:sh 1.2s infinite}
+        @keyframes sh{from{background-position:100% 0}to{background-position:0 0}}
+        .empty{grid-column:1/-1;text-align:center;padding:60px 20px;border:2px dashed var(--line);border-radius:var(--radius);color:var(--muted)}
+        .empty b{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
+        .errbox{grid-column:1/-1;padding:18px;border-radius:var(--radius);background:color-mix(in srgb,var(--danger) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line))}
+
+        /* dialogs */
+        dialog{border:0;border-radius:20px;padding:0;background:var(--surface);color:var(--text);width:min(520px,calc(100vw - 28px));box-shadow:0 30px 80px rgba(0,0,0,.35);max-height:92vh}
+        dialog::backdrop{background:rgba(8,10,25,.55);backdrop-filter:blur(3px)}
+        .dh{display:flex;justify-content:space-between;align-items:center;padding:18px 22px 6px}
+        .dh h2{margin:0;font-size:20px;letter-spacing:-.02em}
+        .x{border:0;background:var(--surface-2);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1}
+        .db{padding:10px 22px 22px;display:grid;gap:14px;overflow:auto;max-height:calc(92vh - 70px)}
+        .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--surface-2);padding:5px;border-radius:12px}
+        .seg button{border:0;padding:9px;border-radius:9px;background:transparent;font-weight:600;cursor:pointer;color:var(--muted)}
+        .seg button[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+        .preview{width:100%;max-height:220px;object-fit:cover;border-radius:12px;display:none;border:1px solid var(--line)}
+        .hint{font-size:12.5px;color:var(--muted)}
+        .err{color:var(--danger);font-size:13.5px;min-height:1.2em;font-weight:500}
+        .detail-img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;background:var(--surface-2)}
+        .sum{background:var(--surface-2);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;font-weight:700}
+
+
+        /* gate */
+        #gate{min-height:calc(100vh - 64px);display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:40px;max-width:1180px;margin:0 auto;padding:30px 20px}
+        @media(max-width:860px){#gate{grid-template-columns:1fr;gap:10px;padding-top:20px}}
+        #gate .hero{padding:0}
+        .points{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:10px;color:var(--muted)}
+        .points li::before{content:"✓";color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2));display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px;margin-right:10px}
+        .gatecard{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:6px 4px 10px}
+        .gatecard .dh{padding-top:20px}
+        /* images fade in once loaded */
+        .thumb img,.detail-img,.pthumb img{opacity:0;transition:opacity .3s}
+        .thumb img[src],.detail-img[src],.pthumb img[src]{opacity:1}
+        /* dashboard */
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:22px 0}
+        .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+        .stat small{color:var(--muted);font-weight:600}
+        .stat b{display:block;font-size:26px;letter-spacing:-.02em;margin-top:2px}
+        .plist{display:grid;gap:12px;padding-bottom:70px}
+        .pitem{display:grid;grid-template-columns:76px 1fr auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}
+        .pitem.expired{opacity:.62}
+        .pthumb{width:76px;height:76px;border-radius:12px;overflow:hidden;background:var(--surface-2)}
+        .pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+        .pthumb .ph{font-size:30px}
+        .pinfo h3{margin:0 0 4px;font-size:16px;overflow-wrap:anywhere}
+        .pinfo .hint{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+        .pamt{text-align:right;font-weight:800;font-size:18px}
+        .pamt small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+        .badge.ok{color:var(--ok)}.badge.rent{color:var(--brand)}
+        @media(max-width:560px){.pitem{grid-template-columns:60px 1fr}.pamt{grid-column:1/-1;text-align:left;display:flex;justify-content:space-between}.pthumb{width:60px;height:60px}}
+
+        /* toasts */
+        #toasts{position:fixed;bottom:20px;right:20px;display:grid;gap:10px;z-index:99;max-width:calc(100vw - 40px)}
+        .toast{background:var(--text);color:var(--bg);padding:12px 16px;border-radius:12px;box-shadow:var(--shadow);font-weight:600;animation:in .2s}
+        .toast.bad{background:var(--danger);color:#fff}.toast.good{background:var(--ok);color:#fff}
+        @keyframes in{from{transform:translateY(10px);opacity:0}}
+        footer{border-top:1px solid var(--line);padding:22px 0;color:var(--muted);font-size:13px;text-align:center}
+        .spin{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:r .7s linear infinite;display:none}
+        .loading .spin{display:inline-block}@keyframes r{to{transform:rotate(360deg)}}
+    </style>
+</head>
+<body>
+<header><div class="wrap bar">
+    <div class="logo"><i>C</i> CampusShare</div>
+    <div class="spacer"></div>
+    <div id="authArea"></div>
+</div></header>
+
+<!-- LOGIN WALL -->
+<section id="gate" hidden>
+    <div class="hero">
+        <h1>Your campus <span>marketplace</span>, members only.</h1>
+        <p>Sign in to browse, sell, rent and buy study resources from students around you.</p>
+        <ul class="points"><li>List notes, books and lab gear in a minute</li><li>Buy or rent with a simple demo checkout</li><li>Track everything you've bought in your dashboard</li></ul>
+    </div>
+    <div class="gatecard">
+        <div class="dh"><h2 id="authTitle">Welcome back</h2></div>
+        <form class="db" id="fAuth" novalidate>
+            <div class="seg"><button type="button" id="mLogin" aria-pressed="true">Log in</button><button type="button" id="mReg" aria-pressed="false">Create account</button></div>
+            <div class="field" id="nameWrap" hidden><label for="aName">Full name</label><input id="aName" autocomplete="name"></div>
+            <div class="field"><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" required></div>
+            <div class="field"><label for="aPass">Password</label><input id="aPass" type="password" autocomplete="current-password" required><span class="hint" id="passHint" hidden>At least 8 characters.</span></div>
+            <div class="err" id="authErr" role="alert"></div>
+            <button class="btn primary" id="authGo" type="submit"><span class="spin"></span><span id="authGoTxt">Log in</span></button>
+        </form>
+    </div>
+</section>
+
+<!-- APP (only after login) -->
+<main class="wrap" id="app" hidden>
+    <section class="hero">
+        <h1>Share, rent &amp; find <span>campus resources</span></h1>
+        <p>Notes, books, lab gear and more, listed by students for students.</p>
+    </section>
+
+    <div class="row" style="flex-wrap:wrap;gap:12px">
+        <div class="tabs" role="tablist">
+            <button class="tab" role="tab" id="tabAll" aria-selected="true">Marketplace</button>
+            <button class="tab" role="tab" id="tabMine" aria-selected="false">My listings</button>
+            <button class="tab" role="tab" id="tabBuys" aria-selected="false">My purchases</button>
+        </div>
+        <button class="btn primary" id="btnAdd">＋ List a resource</button>
+    </div>
+
+    <div id="market">
+        <div class="filters">
+            <div class="field f-name"><label for="fName">Search</label><input id="fName" placeholder="Search by name…" autocomplete="off"></div>
+            <div class="field"><label for="fCat">Category</label><input id="fCat" list="catList" placeholder="Any category" autocomplete="off"></div>
+            <div class="field"><label for="fMin">Min ₹</label><input id="fMin" type="number" min="0" placeholder="0"></div>
+            <div class="field"><label for="fMax">Max ₹</label><input id="fMax" type="number" min="0" placeholder="Any"></div>
+            <div class="field"><label for="fSort">Sort</label>
+                <select id="fSort"><option value="new">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="az">Name A–Z</option></select></div>
+        </div>
+        <div class="meta"><span id="count">&nbsp;</span><button class="btn small ghost" id="btnReset">Clear filters</button></div>
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <div id="purchases" hidden>
+        <div class="stats" id="stats"></div>
+        <div class="plist" id="plist"></div>
+    </div>
+</main>
+
+<footer>CampusShare · demo payments only, no real charges are made.</footer>
+
+<datalist id="catList"></datalist>
+
+<!-- Product form dialog -->
+<dialog id="dForm"><div class="dh"><h2 id="formTitle">List a resource</h2><button class="x" data-close aria-label="Close">×</button></div>
+    <form class="db" id="fProd" novalidate>
+        <div class="field"><label for="pName">Name</label><input id="pName" maxlength="120" required></div>
+        <div class="two">
+            <div class="field"><label for="pCat">Category</label><input id="pCat" list="catList" placeholder="Notes, Books, Lab…" required></div>
+            <div class="field"><label for="pPurpose">Listed for</label><select id="pPurpose"><option>Sale</option><option>Rent</option><option>Sale or Rent</option></select></div>
+        </div>
+        <div class="two">
+            <div class="field"><label for="pPrice">Price (₹)</label><input id="pPrice" type="number" min="0" step="0.01" required></div>
+            <div class="field"><label for="pQty">Quantity</label><input id="pQty" type="number" min="0" step="1" value="1" required></div>
+        </div>
+        <div class="field"><label for="pImg">Photo <span class="hint">(JPEG, PNG or WebP, max 2 MB)</span></label>
+            <input id="pImg" type="file" accept="image/jpeg,image/png,image/webp">
+            <img class="preview" id="pPrev" alt="Selected image preview"><span class="hint" id="keepHint" hidden>Leave empty to keep the current photo.</span></div>
+        <div class="err" id="formErr" role="alert"></div>
+        <button class="btn primary" type="submit" id="formGo"><span class="spin"></span><span id="formGoTxt">Publish listing</span></button>
+    </form></dialog>
+
+<!-- Detail / checkout dialog -->
+<dialog id="dBuy"><div class="dh"><h2 id="buyTitle"></h2><button class="x" data-close aria-label="Close">×</button></div>
+    <form class="db" id="fBuy" novalidate>
+        <img class="detail-img" id="buyImg" alt="">
+        <div class="row"><span class="badge" id="buyCat"></span><span class="badge" id="buyStock"></span></div>
+        <div class="seg" id="buyMode"><button type="button" data-mode="PURCHASE" aria-pressed="true">Buy</button><button type="button" data-mode="RENT" aria-pressed="false">Rent · 30 days</button></div>
+        <div class="sum"><span id="sumLabel">Total (1 unit)</span><span id="sumAmt"></span></div>
+        <div class="field"><label for="cNum">Card number</label><input id="cNum" inputmode="numeric" autocomplete="off" placeholder="1234 5678 9012 3456" maxlength="19"></div>
+        <div class="two">
+            <div class="field"><label for="cExp">Expiry</label><input id="cExp" placeholder="MM/YY" maxlength="5" autocomplete="off"></div>
+            <div class="field"><label for="cCvv">CVV</label><input id="cCvv" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="123"></div>
+        </div>
+        <span class="hint">Demo checkout: any 16-digit number works. No real payment is made.</span>
+        <div class="err" id="buyErr" role="alert"></div>
+        <button class="btn primary" type="submit" id="buyGo"><span class="spin"></span><span id="buyGoTxt">Pay</span></button>
+    </form></dialog>
+
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+    "use strict";
+    const $ = (s, r = document) => r.querySelector(s);
+    const store = {
+        get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+        set(k,v){ try { localStorage.setItem(k,v); } catch {} },
+        del(k){ try { localStorage.removeItem(k); } catch {} }
+    };
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    const money = n => "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    const parseDate = v => Array.isArray(v) ? new Date(v[0], v[1] - 1, v[2], v[3] || 0, v[4] || 0, v[5] || 0) : new Date(v);
+    const fmtDate = v => parseDate(v).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+    const state = {
+        token: store.get("cs_token"),
+        user: (() => { try { return JSON.parse(store.get("cs_user")); } catch { return null; } })(),
+        products: [], view: "all", editing: null, buying: null, mode: "PURCHASE", authMode: "login", imgBust: Date.now()
+    };
+
+    /* ---------- API ---------- */
+    class ApiError extends Error { constructor(m, s){ super(m); this.status = s; } }
+    async function api(path, { method = "GET", json, form, auth = true } = {}) {
+        const headers = {};
+        let body;
+        if (json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(json); }
+        if (form) body = form;                                  // browser sets the multipart boundary
+        if (auth && state.token) headers.Authorization = "Bearer " + state.token;
+        let res;
+        try { res = await fetch(path, { method, headers, body }); }
+        catch { throw new ApiError("Cannot reach the server. Is the backend running?", 0); }
+        const text = await res.text();
+        let data = text;
+        try { data = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) {
+            if (res.status === 401 && auth && state.token) logout(true);
+            const msg = (data && (data.error || data.message)) || (typeof data === "string" && data) ||
+                ({401:"Please log in to continue.",403:"You don't have permission to do that.",404:"Not found.",409:"That item is no longer available.",413:"File is too large (max 2 MB)."}[res.status]) ||
+                "Something went wrong (" + res.status + ").";
+            throw new ApiError(msg, res.status);
+        }
+        return data;
+    }
+
+    /* ---------- authenticated images (an <img> tag can't send the token) ---------- */
+    const imgCache = new Map();
+    function blobUrl(url) {
+        if (!imgCache.has(url)) {
+            const p = fetch(url, { headers: { Authorization: "Bearer " + state.token } })
+                .then(r => { if (!r.ok) throw new Error("img"); return r.blob(); })
+                .then(b => URL.createObjectURL(b));
+            p.catch(() => imgCache.delete(url));
+            imgCache.set(url, p);
+        }
+        return imgCache.get(url);
+    }
+    function clearImages() { imgCache.forEach(p => p.then(u => URL.revokeObjectURL(u)).catch(() => {})); imgCache.clear(); }
+    const imgTag = (p, cls = "") => p.imageUrl
+        ? `<img ${cls ? `class="${cls}" ` : ""}data-src="${esc(p.imageUrl)}?v=${state.imgBust}" data-ph="${esc((p.name || "?")[0].toUpperCase())}" alt="${esc(p.name)}">`
+        : `<div class="ph">${esc((p.name || p.productName || "?")[0].toUpperCase())}</div>`;
+    function hydrate(root = document) {
+        root.querySelectorAll("img[data-src]").forEach(img => {
+            const src = img.dataset.src, ph = img.dataset.ph || "?";
+            img.removeAttribute("data-src");
+            blobUrl(src).then(u => { img.src = u; }).catch(() => {
+                const d = document.createElement("div"); d.className = "ph"; d.textContent = ph; img.replaceWith(d);
+            });
+        });
+    }
+
+    /* ---------- UI helpers ---------- */
+    function toast(msg, kind = "") {
+        const t = document.createElement("div");
+        t.className = "toast " + kind; t.textContent = msg;
+        $("#toasts").append(t); setTimeout(() => t.remove(), 3800);
+    }
+    function busy(btn, on) { btn.disabled = on; btn.classList.toggle("loading", on); }
+    function openDialog(d){ if (!d.open) d.showModal(); }
+    document.addEventListener("click", e => { if (e.target.closest("[data-close]")) e.target.closest("dialog").close(); });
+    document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+
+    /* ---------- login wall ---------- */
+    function renderAuth() {
+        const a = $("#authArea");
+        if (state.user && state.token) {
+            const initial = (state.user.name || "?").trim()[0]?.toUpperCase() || "?";
+            a.innerHTML = `<div class="user"><div class="avatar">${esc(initial)}</div><b>${esc(state.user.name)}</b><button class="btn small" id="btnOut">Log out</button></div>`;
+            $("#btnOut").onclick = () => logout(false);
+        } else a.innerHTML = "";
+    }
+    function showGate(mode = "login") {
+        $("#app").hidden = true; $("#gate").hidden = false; renderAuth(); setAuthMode(mode);
+        $("#authErr").textContent = "";
+    }
+    function showApp() {
+        $("#gate").hidden = true; $("#app").hidden = false; renderAuth(); setView("all"); load();
+    }
+    function logout(expired) {
+        state.token = null; state.user = null; state.products = []; state.purchases = null;
+        store.del("cs_token"); store.del("cs_user"); clearImages();
+        $("#grid").innerHTML = ""; $("#plist").innerHTML = "";
+        showGate("login");
+        toast(expired ? "Session expired. Please log in again." : "Logged out.", expired ? "bad" : "");
+    }
+    function setAuthMode(mode) {
+        state.authMode = mode; const reg = mode === "register";
+        $("#mLogin").setAttribute("aria-pressed", !reg); $("#mReg").setAttribute("aria-pressed", reg);
+        $("#nameWrap").hidden = !reg; $("#passHint").hidden = !reg;
+        $("#authTitle").textContent = reg ? "Join CampusShare" : "Welcome back";
+        $("#authGoTxt").textContent = reg ? "Create account" : "Log in";
+        $("#aPass").autocomplete = reg ? "new-password" : "current-password";
+    }
+    $("#mLogin").onclick = () => setAuthMode("login");
+    $("#mReg").onclick = () => setAuthMode("register");
+    $("#fAuth").addEventListener("submit", async e => {
+        e.preventDefault();
+        const reg = state.authMode === "register", err = $("#authErr"), btn = $("#authGo");
+        const name = $("#aName").value.trim(), email = $("#aEmail").value.trim(), password = $("#aPass").value;
+        err.textContent = "";
+        if (reg && !name) return err.textContent = "Please enter your name.";
+        if (!/^\S+@\S+\.\S+$/.test(email)) return err.textContent = "Enter a valid email address.";
+        if (!password) return err.textContent = "Enter your password.";
+        if (reg && password.length < 8) return err.textContent = "Password must be at least 8 characters.";
+        busy(btn, true);
+        try {
+            const r = await api(reg ? "/api/auth/register" : "/api/auth/login", { method: "POST", json: reg ? { name, email, password } : { email, password }, auth: false });
+            state.token = r.token; state.user = { id: r.userId, name: r.name };
+            store.set("cs_token", r.token); store.set("cs_user", JSON.stringify(state.user));
+            $("#fAuth").reset(); showApp(); toast("Welcome, " + r.name + "!", "good");
+        } catch (ex) { err.textContent = ex.message; }
+        finally { busy(btn, false); }
+    });
+
+    /* ---------- marketplace ---------- */
+    let loadSeq = 0;
+    async function load() {
+        const seq = ++loadSeq;
+        const p = new URLSearchParams();
+        const name = $("#fName").value.trim(), cat = $("#fCat").value.trim(), min = $("#fMin").value, max = $("#fMax").value;
+        if (name) p.set("name", name); if (cat) p.set("category", cat);
+        if (min !== "") p.set("minPrice", min); if (max !== "") p.set("maxPrice", max);
+        $("#grid").innerHTML = '<div class="sk"></div>'.repeat(6);
+        try {
+            const data = await api("/api/products/search?" + p);
+            if (seq !== loadSeq) return;                         // a newer search superseded this one
+            state.products = Array.isArray(data) ? data : [];
+            fillCategories(); render();
+        } catch (ex) {
+            if (seq !== loadSeq || !state.token) return;
+            $("#grid").innerHTML = `<div class="errbox"><b>Couldn't load listings.</b><br>${esc(ex.message)}<br><br><button class="btn small" id="retry">Try again</button></div>`;
+            $("#count").textContent = ""; $("#retry").onclick = load;
+        }
+    }
+    const catSet = new Set(["Notes", "Books", "Electronics", "Lab Equipment", "Stationery"]);
+    function fillCategories() {
+        state.products.forEach(p => p.category && catSet.add(p.category));
+        $("#catList").innerHTML = [...catSet].sort().map(c => `<option value="${esc(c)}">`).join("");
+    }
+    function visible() {
+        let list = state.products.slice();
+        if (state.view === "mine") list = list.filter(p => p.createdByUserId === state.user.id);
+        const s = $("#fSort").value;
+        list.sort({ new:(a,b)=>b.id-a.id, low:(a,b)=>a.price-b.price, high:(a,b)=>b.price-a.price, az:(a,b)=>String(a.name).localeCompare(String(b.name)) }[s]);
+        return list;
+    }
+    function render() {
+        if (!state.user) return;
+        const list = visible(), grid = $("#grid");
+        $("#count").textContent = list.length + (list.length === 1 ? " resource" : " resources");
+        if (!list.length) {
+            const mine = state.view === "mine";
+            grid.innerHTML = `<div class="empty"><b>${mine ? "You haven't listed anything yet" : "Nothing found"}</b>${mine ? "Share notes, books or gear with your campus." : "Try different filters or be the first to list something."}</div>`;
+            return;
+        }
+        grid.innerHTML = list.map(p => {
+            const own = p.createdByUserId === state.user.id, out = p.quantity <= 0;
+            const stock = out ? '<span class="badge out">Sold out</span>' : p.quantity <= 3 ? `<span class="badge low">Only ${p.quantity} left</span>` : `<span class="badge">${p.quantity} available</span>`;
+            return `<article class="card" data-id="${p.id}" tabindex="0">
+      <div class="thumb">${imgTag(p)}<span class="chip">${esc(p.category || "General")}</span>${own ? '<span class="mine">YOURS</span>' : ""}</div>
+      <div class="body"><h3>${esc(p.name)}</h3>
+        <div class="row"><span class="price">${money(p.price)}</span>${stock}</div>
+        <div class="hint">${esc(p.purpose || "")}</div>
+        <div class="actions">${own
+                ? `<button class="btn small" data-act="edit">Edit</button><button class="btn small danger" data-act="del">Delete</button>`
+                : `<button class="btn small primary" data-act="buy" ${out ? "disabled" : ""}>${out ? "Sold out" : "View &amp; get"}</button>`}</div>
+      </div></article>`;
+        }).join("");
+        hydrate(grid);
+    }
+    $("#grid").addEventListener("click", e => {
+        const card = e.target.closest(".card"); if (!card) return;
+        const id = +card.dataset.id, act = e.target.closest("[data-act]")?.dataset.act;
+        const p = state.products.find(x => x.id === id); if (!p) return;
+        const own = p.createdByUserId === state.user.id;
+        if (act === "edit") openForm(p);
+        else if (act === "del") removeProduct(p);
+        else if (own) openForm(p);
+        else if (p.quantity > 0) openBuy(p);
+    });
+    $("#grid").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.classList.contains("card")) e.target.click(); });
+
+    /* ---------- filters / tabs ---------- */
+    let t; const debounced = () => { clearTimeout(t); t = setTimeout(load, 300); };
+    ["#fName", "#fCat", "#fMin", "#fMax"].forEach(s => $(s).addEventListener("input", debounced));
+    $("#fSort").addEventListener("change", render);
+    $("#btnReset").onclick = () => { ["#fName", "#fCat", "#fMin", "#fMax"].forEach(s => $(s).value = ""); $("#fSort").value = "new"; load(); };
+    function setView(v) {
+        state.view = v;
+        $("#tabAll").setAttribute("aria-selected", v === "all");
+        $("#tabMine").setAttribute("aria-selected", v === "mine");
+        $("#tabBuys").setAttribute("aria-selected", v === "buys");
+        $("#market").hidden = v === "buys"; $("#purchases").hidden = v !== "buys";
+        if (v === "buys") loadPurchases(); else render();
+    }
+    $("#tabAll").onclick = () => setView("all");
+    $("#tabMine").onclick = () => setView("mine");
+    $("#tabBuys").onclick = () => setView("buys");
+
+    /* ---------- purchases dashboard ---------- */
+    async function loadPurchases() {
+        $("#stats").innerHTML = ""; $("#plist").innerHTML = '<div class="sk" style="height:100px"></div>'.repeat(3);
+        try {
+            const rows = await api("/api/products/my-purchases");
+            state.purchases = Array.isArray(rows) ? rows : [];
+            renderPurchases();
+        } catch (ex) {
+            if (!state.token) return;
+            $("#plist").innerHTML = `<div class="errbox"><b>Couldn't load your purchases.</b><br>${esc(ex.message)}<br><br><button class="btn small" id="retryP">Try again</button></div>`;
+            $("#retryP").onclick = loadPurchases;
+        }
+    }
+    function renderPurchases() {
+        const rows = state.purchases || [], now = Date.now();
+        const spent = rows.reduce((s, r) => s + (r.amountPaid || 0), 0);
+        const owned = rows.filter(r => r.type === "PURCHASE").length;
+        const rentals = rows.filter(r => r.type === "RENT" && r.active).length;
+        $("#stats").innerHTML = [["Total spent", money(spent)], ["Items owned", owned], ["Active rentals", rentals], ["Orders", rows.length]]
+            .map(([k, v]) => `<div class="stat"><small>${k}</small><b>${v}</b></div>`).join("");
+        if (!rows.length) {
+            $("#plist").innerHTML = `<div class="empty"><b>No purchases yet</b>Things you buy or rent will show up here.<br><br><button class="btn primary" id="goShop">Browse marketplace</button></div>`;
+            $("#goShop").onclick = () => setView("all"); return;
+        }
+        $("#plist").innerHTML = rows.map(r => {
+            const rent = r.type === "RENT";
+            let status = '<span class="badge ok">Owned</span>';
+            if (rent) {
+                const left = Math.ceil((parseDate(r.rentalExpiry) - now) / 86400000);
+                status = r.active ? `<span class="badge rent">Rental · ${left} day${left === 1 ? "" : "s"} left</span>` : '<span class="badge out">Rental expired</span>';
+            }
+            const thumb = r.imageUrl ? `<img data-src="${esc(r.imageUrl)}?v=${state.imgBust}" data-ph="${esc((r.productName || "?")[0].toUpperCase())}" alt="">` : `<div class="ph">${esc((r.productName || "?")[0].toUpperCase())}</div>`;
+            return `<article class="pitem ${r.active ? "" : "expired"}">
+      <div class="pthumb">${thumb}</div>
+      <div class="pinfo"><h3>${esc(r.productName)}</h3>
+        <div class="hint">${status}<span>${esc(r.category || "")}</span><span>· ${fmtDate(r.purchasedAt)}</span>${rent && r.rentalExpiry ? `<span>· until ${fmtDate(r.rentalExpiry)}</span>` : ""}</div></div>
+      <div class="pamt">${money(r.amountPaid)}<small>${rent ? "Rented" : "Purchased"}</small></div></article>`;
+        }).join("");
+        hydrate($("#plist"));
+    }
+
+    /* ---------- add / edit ---------- */
+    const MAX_IMG = 2 * 1024 * 1024, TYPES = ["image/jpeg", "image/png", "image/webp"];
+    $("#btnAdd").onclick = () => openForm(null);
+    function openForm(p) {
+        state.editing = p; $("#fProd").reset(); $("#formErr").textContent = ""; $("#pPrev").style.display = "none"; $("#pPrev").removeAttribute("src");
+        $("#formTitle").textContent = p ? "Edit listing" : "List a resource";
+        $("#formGoTxt").textContent = p ? "Save changes" : "Publish listing";
+        $("#keepHint").hidden = !(p && p.imageUrl);
+        if (p) {
+            $("#pName").value = p.name || ""; $("#pCat").value = p.category || ""; $("#pPrice").value = p.price;
+            $("#pQty").value = p.quantity;
+            const o = [...$("#pPurpose").options].find(o => o.value === p.purpose); if (o) $("#pPurpose").value = o.value;
+            if (p.imageUrl) blobUrl(p.imageUrl + "?v=" + state.imgBust).then(u => { $("#pPrev").src = u; $("#pPrev").style.display = "block"; }).catch(() => {});
+        }
+        openDialog($("#dForm"));
+    }
+    $("#pImg").addEventListener("change", () => {
+        const f = $("#pImg").files[0], err = $("#formErr"); err.textContent = "";
+        if (!f) return;
+        if (!TYPES.includes(f.type)) { err.textContent = "Only JPEG, PNG or WebP images are allowed."; $("#pImg").value = ""; return; }
+        if (f.size > MAX_IMG) { err.textContent = "Image must be 2 MB or smaller."; $("#pImg").value = ""; return; }
+        const prev = $("#pPrev"); prev.src = URL.createObjectURL(f); prev.style.display = "block";
+    });
+    $("#fProd").addEventListener("submit", async e => {
+        e.preventDefault();
+        const err = $("#formErr"), btn = $("#formGo"); err.textContent = "";
+        const name = $("#pName").value.trim(), category = $("#pCat").value.trim(), price = $("#pPrice").value, qty = $("#pQty").value;
+        if (!name) return err.textContent = "Please enter a name.";
+        if (!category) return err.textContent = "Please enter a category.";
+        if (price === "" || +price < 0) return err.textContent = "Enter a valid price.";
+        if (qty === "" || !Number.isInteger(+qty) || +qty < 0) return err.textContent = "Quantity must be a whole number, 0 or more.";
+        const fd = new FormData();
+        fd.append("name", name); fd.append("category", category); fd.append("price", price);
+        fd.append("quantity", qty); fd.append("purpose", $("#pPurpose").value);
+        const f = $("#pImg").files[0]; if (f) fd.append("image", f);
+        busy(btn, true);
+        try {
+            const editing = state.editing;
+            await api(editing ? "/api/products/update/" + editing.id : "/api/products/add", { method: editing ? "PUT" : "POST", form: fd });
+            state.imgBust = Date.now(); $("#dForm").close();
+            toast(editing ? "Listing updated." : "Listing published!", "good"); load();
+        } catch (ex) { err.textContent = ex.message; }
+        finally { busy(btn, false); }
+    });
+    async function removeProduct(p) {
+        if (!confirm(`Delete "${p.name}"? This can't be undone.`)) return;
+        try { await api("/api/products/delete/" + p.id, { method: "DELETE" }); toast("Listing deleted.", "good"); load(); }
+        catch (ex) { toast(ex.message, "bad"); }
+    }
+
+    /* ---------- buy / rent ---------- */
+    const rentPrice = p => Math.round(p.price * 0.3 * 100) / 100;      // same rule as the server: 30% of price for 30 days
+    function openBuy(p) {
+        state.buying = p; $("#fBuy").reset(); $("#buyErr").textContent = "";
+        $("#buyTitle").textContent = p.name; $("#buyCat").textContent = p.category || "General";
+        $("#buyStock").textContent = p.quantity + " in stock";
+        const img = $("#buyImg"); img.alt = p.name; img.removeAttribute("src");
+        if (p.imageUrl) { img.style.display = ""; blobUrl(p.imageUrl + "?v=" + state.imgBust).then(u => { img.src = u; }).catch(() => { img.style.display = "none"; }); }
+        else img.style.display = "none";
+        const purpose = (p.purpose || "").toLowerCase(), canBuy = !purpose.includes("rent") || purpose.includes("sale"), canRent = purpose.includes("rent") || !purpose;
+        $("#buyMode [data-mode=PURCHASE]").hidden = !canBuy; $("#buyMode [data-mode=RENT]").hidden = !canRent;
+        $("#buyMode").style.gridTemplateColumns = canBuy && canRent ? "1fr 1fr" : "1fr";
+        setMode(canBuy ? "PURCHASE" : "RENT"); openDialog($("#dBuy"));
+    }
+    function setMode(m) {
+        state.mode = m; const p = state.buying, amt = m === "RENT" ? rentPrice(p) : p.price;
+        document.querySelectorAll("#buyMode button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m));
+        $("#sumLabel").textContent = m === "RENT" ? "Rent for 30 days (1 unit)" : "Total (1 unit)";
+        $("#sumAmt").textContent = money(amt);
+        $("#buyGoTxt").textContent = (m === "RENT" ? "Rent for " : "Pay ") + money(amt);
+    }
+    $("#buyMode").addEventListener("click", e => { const b = e.target.closest("button[data-mode]"); if (b) setMode(b.dataset.mode); });
+    $("#cNum").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim(); });
+    $("#cCvv").addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); });
+    $("#cExp").addEventListener("input", e => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); e.target.value = v; });
+    $("#fBuy").addEventListener("submit", async e => {
+        e.preventDefault();
+        const err = $("#buyErr"), btn = $("#buyGo"); err.textContent = "";
+        const card = $("#cNum").value.replace(/\s/g, ""), cvv = $("#cCvv").value, exp = $("#cExp").value;
+        if (card.length !== 16) return err.textContent = "Enter a 16-digit card number.";
+        if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(exp)) return err.textContent = "Enter expiry as MM/YY.";
+        if (cvv.length < 3) return err.textContent = "Enter the 3 or 4 digit CVV.";
+        const p = state.buying;
+        busy(btn, true);
+        try {
+            // the server looks up the real price and reduces stock; amount here is informational only
+            await api("/api/products/checkout", { method: "POST", json: { productId: p.id, transactionType: state.mode, amount: state.mode === "RENT" ? rentPrice(p) : p.price, cardNumber: card, cvv } });
+            $("#dBuy").close(); state.purchases = null;
+            toast(state.mode === "RENT" ? "Rental confirmed for 30 days!" : "Purchase complete!", "good");
+            load();                                                // refresh stock counts
+        } catch (ex) { err.textContent = ex.message; if (ex.status === 409 || ex.status === 404) load(); }
+        finally { busy(btn, false); }
+    });
+
+    /* ---------- boot ---------- */
+    if (state.token && state.user) showApp(); else showGate("login");
+</script>
+</body>
+</html>

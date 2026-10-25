@@ -2,88 +2,96 @@ package EdTech.Controller;
 
 import EdTech.DTO.PaymentRequestDTO;
 import EdTech.DTO.ProductDTO;
+import EdTech.DTO.PurchaseDTO;
+import EdTech.Entity.ProductEntity;
 import EdTech.Services.ProductServices;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.AccessDeniedException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/products")
+@AllArgsConstructor
 public class ProductController {
+    private final ProductServices productServices;
 
-    @Autowired
-    private ProductServices productServices;
-
-    // 1. Add Product
-    @PostMapping("/add")
-    public ResponseEntity<ProductDTO> addProduct(@RequestBody ProductDTO dto) {
-        ProductDTO savedProduct = productServices.addProduct(dto);
-        return new ResponseEntity<>(savedProduct, HttpStatus.CREATED);
+    @PostMapping(value = "/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductDTO> addProduct(
+            @RequestParam String name,
+            @RequestParam String category,
+            @RequestParam int quantity,
+            @RequestParam double price,
+            @RequestParam(required = false) String purpose,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @AuthenticationPrincipal Integer userId) {
+        return new ResponseEntity<>(
+                productServices.addProduct(name, category, quantity, price, purpose, image, userId),
+                HttpStatus.CREATED);
     }
 
-    // 2. View All Products
     @GetMapping("/all")
     public ResponseEntity<List<ProductDTO>> viewAllProduct() {
-        List<ProductDTO> products = productServices.viewAllProduct();
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productServices.viewAllProduct());
     }
 
-    // 3. Search Products by Optional Parameters
     @GetMapping("/search")
     public ResponseEntity<List<ProductDTO>> viewProductByParameter(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Double minPrice,
             @RequestParam(required = false) Double maxPrice) {
-
-        List<ProductDTO> products = productServices.viewProductByParameter(name, category, minPrice, maxPrice);
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productServices.viewProductByParameter(name, category, minPrice, maxPrice));
     }
 
-    // 4. Create Order (Purchase/Rent & Process Dummy Payment)
+    @GetMapping("/{id}/image")
+    public ResponseEntity<byte[]> getImage(@PathVariable Integer id) {
+        ProductEntity p = productServices.getProductWithImage(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(p.getImageContentType()))
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS))
+                .body(p.getImageBytes());
+    }
+
     @PostMapping("/checkout")
-    public ResponseEntity<String> checkout(@RequestBody PaymentRequestDTO request) {
-        try {
-            productServices.createOrder(request);
-            return ResponseEntity.ok("Order processed successfully. Resource added to your dashboard.");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    public ResponseEntity<String> checkout(@RequestBody PaymentRequestDTO request,
+                                           @AuthenticationPrincipal Integer userId) {
+        request.setUserId(userId);               // buyer is whoever the token says, not the body
+        productServices.createOrder(request);
+        return ResponseEntity.ok("Order processed successfully. Resource added to your dashboard.");
     }
 
-    // 5. Update Product Details (Owner Protected)
-    @PutMapping("/update/{productId}")
-    public ResponseEntity<?> updateProduct(
-            @PathVariable Integer productId,
-            @RequestBody ProductDTO updatedDto,
-            @RequestHeader("X-User-Id") Integer requestingUserId) {
-        try {
-            ProductDTO product = productServices.updateProduct(productId, updatedDto, requestingUserId);
-            return ResponseEntity.ok(product);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        } catch (AccessDeniedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-        }
+    @PutMapping(value = "/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductDTO> updateProduct(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer quantity,
+            @RequestParam(required = false) Double price,
+            @RequestParam(required = false) String purpose,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @AuthenticationPrincipal Integer userId) {
+        return ResponseEntity.ok(
+                productServices.updateProduct(id, name, category, quantity, price, purpose, image, userId));
     }
 
-    // 6. Delete Product (Owner Protected)
-    @DeleteMapping("/delete/{productId}")
-    public ResponseEntity<String> deleteProduct(
-            @PathVariable Integer productId,
-            @RequestHeader("X-User-Id") Integer requestingUserId) {
-        try {
-            productServices.deleteProduct(productId, requestingUserId);
-            return ResponseEntity.ok("Product deleted successfully.");
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        } catch (AccessDeniedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-        }
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<String> deleteProduct(@PathVariable Integer id,
+                                                @AuthenticationPrincipal Integer userId) {
+        productServices.deleteProduct(id, userId);
+        return ResponseEntity.ok("Product deleted successfully.");
+    }
+    @GetMapping("/my-purchases")
+    public ResponseEntity<List<PurchaseDTO>> myPurchases(@AuthenticationPrincipal Integer userId) {
+        return ResponseEntity.ok(productServices.getMyPurchases(userId));
     }
 }

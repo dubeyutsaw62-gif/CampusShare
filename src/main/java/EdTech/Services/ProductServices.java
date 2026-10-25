@@ -2,117 +2,180 @@ package EdTech.Services;
 
 import EdTech.DTO.PaymentRequestDTO;
 import EdTech.DTO.ProductDTO;
+import EdTech.DTO.PurchaseDTO;
 import EdTech.Entity.ProductEntity;
 import EdTech.Entity.TransactionEntity;
 import EdTech.Entity.TransactionType;
 import EdTech.Repository.ProductRepository;
 import EdTech.Repository.TransactionRepository;
+import java.io.IOException;
 import jakarta.persistence.EntityNotFoundException;
-import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.nio.file.AccessDeniedException;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.access.AccessDeniedException;
+import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ProductServices {
-    @Autowired
-    private ModelMapper modelMapper;
-    @Autowired
-    private ProductRepository repository;
-    @Autowired
-    private TransactionRepository transactionRepository;
+    private static final long MAX_IMAGE_BYTES = 2L * 1024 * 1024;
 
-    public ProductDTO addProduct(ProductDTO dto){
-        ProductEntity entity = modelMapper.map(dto, ProductEntity.class);
-        ProductEntity savedEntity = repository.save(entity);
-        return modelMapper.map(savedEntity, ProductDTO.class);
-    }
-    public List<ProductDTO> viewAllProduct(){
-        List<ProductEntity> entities = repository.findAll();
-        return entities.stream()
-                .map(entity -> modelMapper.map(entity, ProductDTO.class))
-                .collect(Collectors.toList());
-    }
-    public List<ProductDTO> viewProductByParameter(String name, String category, Double minPrice, Double maxPrice){
-        List<ProductEntity> entities = repository.searchProducts(name, category, minPrice, maxPrice);
+    private final ProductRepository repository;
+    private final TransactionRepository transactionRepository;
 
-        // Map list of entities to list of DTOs safely using Streams
-        return entities.stream()
-                .map(entity -> modelMapper.map(entity, ProductDTO.class))
-                .collect(Collectors.toList());
+    public ProductDTO addProduct(String name, String category, int quantity, double price,
+                                 String purpose, MultipartFile image, Integer ownerId) {
+        ProductEntity e = new ProductEntity();
+        e.setName(name);
+        e.setCategory(category);
+        e.setQuantity(quantity);
+        e.setPrice(price);
+        e.setPurpose(purpose);
+        e.setCreatedByUserId(ownerId);          // owner comes from the JWT, never from the client
+        applyImage(e, image);
+        return toDto(repository.save(e));
     }
+
+    public List<ProductDTO> viewAllProduct() {
+        return repository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    public List<ProductDTO> viewProductByParameter(String name, String category,
+                                                   Double minPrice, Double maxPrice) {
+        return repository.searchProducts(name, category, minPrice, maxPrice)
+                .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    public ProductEntity getProductWithImage(Integer id) {
+        ProductEntity p = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + id));
+        if (p.getImageBytes() == null) {
+            throw new EntityNotFoundException("This product has no image.");
+        }
+        return p;
+    }
+
+    public ProductDTO updateProduct(Integer id, String name, String category, Integer quantity,
+                                    Double price, String purpose, MultipartFile image, Integer userId) {
+        ProductEntity e = findOwned(id, userId);
+        if (name != null) e.setName(name);
+        if (category != null) e.setCategory(category);
+        if (quantity != null) e.setQuantity(quantity);
+        if (price != null) e.setPrice(price);
+        if (purpose != null) e.setPurpose(purpose);
+        applyImage(e, image);                    // only replaces the image if a new one was sent
+        return toDto(repository.save(e));
+    }
+
+    public void deleteProduct(Integer id, Integer userId) {
+        repository.delete(findOwned(id, userId));
+    }
+
+    // ---- payment (unchanged from your version) ----
     public boolean processPayment(PaymentRequestDTO request) {
-        // 1. Dummy Payment Gate Validation
         if (request.getCardNumber() == null || request.getCardNumber().length() < 16) {
             throw new IllegalArgumentException("Invalid card details. Payment failed.");
         }
-
-        // 2. Mocking a successful payment transfer
-        System.out.println("Processing dummy payment of $" + request.getAmount() + " for user " + request.getUserId());
-        return true; // Payment approved!
+        return true;
     }
 
+    private static final double RENT_RATE = 0.30; // rent for 30 days = 30% of price
+
+    @Transactional
     public void createOrder(PaymentRequestDTO request) {
-        // Execute the dummy payment process first
         processPayment(request);
 
-        // Save order data into the database
-        TransactionEntity transaction = new TransactionEntity();
-        transaction.setUserId(request.getUserId());
-        transaction.setProductId(request.getProductId());
-        transaction.setAmountPaid(request.getAmount());
-        transaction.setTransactionDate(LocalDateTime.now());
+        if (request.getProductId() == null) {
+            throw new IllegalArgumentException("Product is required.");
+        }
+        ProductEntity product = repository.findById(request.getProductId())
+                .orElseThrow(() -> new EntityNotFoundException("Product not found."));
+        if (Objects.equals(product.getCreatedByUserId(), request.getUserId())) {
+            throw new IllegalArgumentException("You can't buy your own listing.");
+        }
+        if (repository.decrementStock(product.getId()) == 0) {
+            throw new IllegalStateException("Sorry, this item just sold out.");
+        }
 
-        if ("RENT".equalsIgnoreCase(request.getTransactionType())) {
-            transaction.setType(TransactionType.RENT);
-            // Example: Rentals last exactly 30 days
-            transaction.setRentalExpiryDate(LocalDateTime.now().plusDays(30));
+        boolean rent = "RENT".equalsIgnoreCase(request.getTransactionType());
+        TransactionEntity t = new TransactionEntity();
+        t.setUserId(request.getUserId());
+        t.setProductId(product.getId());
+        t.setTransactionDate(LocalDateTime.now());
+        if (rent) {
+            t.setType(TransactionType.RENT);
+            t.setAmountPaid(Math.round(product.getPrice() * RENT_RATE * 100) / 100.0); // server decides the price
+            t.setRentalExpiryDate(LocalDateTime.now().plusDays(30));
         } else {
-            transaction.setType(TransactionType.PURCHASE);
-            transaction.setRentalExpiryDate(null); // Permanent access
+            t.setType(TransactionType.PURCHASE);
+            t.setAmountPaid(product.getPrice());
         }
-
-        transactionRepository.save(transaction);
-    }
-    public ProductDTO updateProduct(Integer productId, ProductDTO updatedDto, Integer requestingUserId) throws AccessDeniedException {
-        // 1. Fetch the existing product from DB
-        ProductEntity existingEntity = repository.findById(productId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
-
-        // 2. Security Check: Verify requesting user is the owner
-        if (!existingEntity.getCreatedByUserId().equals(requestingUserId)) {
-            throw new AccessDeniedException("You do not have permission to modify this product.");
-        }
-
-        // 3. Map new changes onto the existing managed entity (excluding ID and Owner)
-        existingEntity.setName(updatedDto.getName());
-        existingEntity.setPrice(updatedDto.getPrice());
-        existingEntity.setCategory(updatedDto.getCategory());
-        // Add any other fields your product contains here...
-
-        // 4. Save updates and map back to DTO
-        ProductEntity savedEntity = repository.save(existingEntity);
-        return modelMapper.map(savedEntity, ProductDTO.class);
+        transactionRepository.save(t);   // if this fails, the stock decrement rolls back too
     }
 
-    public void deleteProduct(Integer productId, Integer requestingUserId) throws AccessDeniedException {
-        // 1. Fetch the existing product from DB
-        ProductEntity existingEntity = repository.findById(productId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
-
-        // 2. Security Check: Verify requesting user is the owner
-        if (!existingEntity.getCreatedByUserId().equals(requestingUserId)) {
-            throw new AccessDeniedException("You do not have permission to delete this product.");
+    // ---- helpers ----
+    private ProductEntity findOwned(Integer id, Integer userId) {
+        ProductEntity e = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + id));
+        if (!Objects.equals(e.getCreatedByUserId(), userId)) {   // null-safe, no more NPE
+            throw new AccessDeniedException("You do not own this product.");
         }
-
-        // 3. Perform hard deletion
-        repository.delete(existingEntity);
+        return e;
+    }
+    public List<PurchaseDTO> getMyPurchases(Integer userId) {
+        List<TransactionEntity> txs = transactionRepository.findByUserIdOrderByTransactionDateDesc(userId);
+        Map<Integer, ProductEntity> products = repository.findAllById(
+                        txs.stream().map(TransactionEntity::getProductId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(ProductEntity::getId, p -> p));
+        LocalDateTime now = LocalDateTime.now();
+        return txs.stream().map(t -> {
+            ProductEntity p = products.get(t.getProductId());
+            boolean active = t.getType() == TransactionType.PURCHASE
+                    || (t.getRentalExpiryDate() != null && t.getRentalExpiryDate().isAfter(now));
+            return new PurchaseDTO(t.getId(), t.getProductId(),
+                    p != null ? p.getName() : "(listing removed)",
+                    p != null ? p.getCategory() : null,
+                    p != null && p.getImageBytes() != null ? "/api/products/" + p.getId() + "/image" : null,
+                    t.getType().name(), t.getAmountPaid(), t.getTransactionDate(), t.getRentalExpiryDate(), active);
+        }).collect(Collectors.toList());
+    }
+    private void applyImage(ProductEntity e, MultipartFile image) {
+        if (image == null || image.isEmpty()) return;
+        if (image.getSize() > MAX_IMAGE_BYTES) {
+            throw new IllegalArgumentException("Image must be 2 MB or smaller.");
+        }
+        try {
+            byte[] bytes = image.getBytes();
+            String type = detectType(bytes);     // checks real file bytes, not the client's claim
+            if (type == null) {
+                throw new IllegalArgumentException("Only JPEG, PNG or WebP images are allowed.");
+            }
+            e.setImageBytes(bytes);
+            e.setImageContentType(type);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
     }
 
+    private String detectType(byte[] b) {
+        if (b.length < 12) return null;
+        if ((b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) return "image/jpeg";
+        if ((b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') return "image/png";
+        if (b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
+                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') return "image/webp";
+        return null;
+    }
 
+    private ProductDTO toDto(ProductEntity e) {
+        String url = e.getImageBytes() != null ? "/api/products/" + e.getId() + "/image" : null;
+        return new ProductDTO(e.getId(), e.getName(), e.getCategory(), e.getQuantity(),
+                e.getPrice(), e.getPurpose(), url, e.getCreatedByUserId());
+    }
 }

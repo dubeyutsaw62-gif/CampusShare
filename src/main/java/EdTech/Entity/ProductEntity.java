@@ -23,5 +23,6 @@ public class ProductEntity {
     @Lob // Tells Hibernate to create a BLOB/LONGBLOB column datatype
     @Column(length = 1000000) // Allocates enough storage space for large files
     private byte[] imageBytes;
+    private String imageContentType; // e.g. image/png
     private Integer createdByUserId;
 }

@@ -9,10 +9,6 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 @Repository
-public interface TransactionRepository extends JpaRepository<TransactionEntity, Long> {
-
-    // Finds all purchases OR active rentals that haven't expired yet
-    @Query("SELECT t.productId FROM TransactionEntity t WHERE t.userId = :userId AND " +
-            "(t.type = 'PURCHASE' OR (t.type = 'RENT' AND t.rentalExpiryDate > :now))")
-    List<Long> findActiveProductIdsByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+public interface TransactionRepository extends JpaRepository<TransactionEntity, Integer> {
+    List<TransactionEntity> findByUserIdOrderByTransactionDateDesc(Integer userId);
 }
